@@ -1,0 +1,17 @@
+---
+# defaults file for ansible-role-backup-kvm_lvm
+#
+
+# Where the script will be installed
+backup_script_dest: "/usr/local/bin/kvm_lvm_backup.sh"
+# Set this to True to copy in the script
+backup_enabled: False
+# The size of the LVM snapshot
+backup_snapsize: "1G"
+backup_vms: ""
+backup_lvm: ""
+backup_vg: ""
+# Examples:
+#backup_vms: "jade-install"
+#backup_lvm: "install_vm_lv"
+#backup_vg: "admin_vg"
