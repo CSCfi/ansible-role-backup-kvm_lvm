@@ -12,8 +12,8 @@ backup_vms: ""
 backup_lvm: ""
 backup_vg: ""
 # Examples:
-#backup_vms: "jade-install"
-#backup_lvm: "install_vm_lv"
+#backup_vms: "jade-install jade-login"
+#backup_lvms: "install_vm_lv login_vm_lv"
 #backup_vg: "admin_vg"
 #
 backup_mntpoint: "/mnt"

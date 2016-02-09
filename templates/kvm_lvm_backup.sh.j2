@@ -31,11 +31,9 @@ echo ""
 
 DEBUG="1" # anything but "" means debug is on
 VMS="{{ backup_vms }}" # space separated list of virtual machines to resume and suspend
-LVM="{{ backup_lvm }}" # the name of the logical volume (as seen in lvs)
+LVMS="{{ backup_lvms }}" # space separated list of logical volumes (as seen in lvs)
 VG="{{ backup_vg }}" # the name of the volume group (as seen in vgs)
-LVM_PATH="/dev/$VG/$LVM" # the path to the logical volume
 SNAPSIZE="{{ backup_snapsize }}" # the size of the snapshot
-MNTPOINT="{{ backup_mntpoint }}/$LVM-snap" # where to mount the snapshot
 MNTOPTIONS="{{ backup_mountoptions }}" # perhaps nouuid for xfs snapshots
 
 ##############
@@ -70,16 +68,20 @@ snapshot() {
 # Check if there is an active snapshot first.
 # Take a snapshot of the LVM
 
-SNAPSHOT="$(lvs|grep $LVM-snap|wc -l)"
-if [ "$SNAPSHOT" != 0 ]; then
-	if [ "$DEBUG" != "" ]; then
-		echo "There is already a snapshot"
-	fi
-	let BAD_CNT+=1
-	removesnap
-fi
+for LVM in $LVMS; do
 
-lvcreate -L $SNAPSIZE -s -n "$LVM-snap" $LVM_PATH
+  SNAPSHOT="$(lvs|grep $LVM-snap|wc -l)"
+  if [ "$SNAPSHOT" != 0 ]; then
+  	if [ "$DEBUG" != "" ]; then
+  		echo "There is already a snapshot"
+  	fi
+  	let BAD_CNT+=1
+  	removesnap
+  fi
+  LVM_PATH="/dev/$VG/$LVM" # the path to the logical volume
+  lvcreate -L $SNAPSIZE -s -n "$LVM-snap" $LVM_PATH
+
+done
 
 }
 
@@ -97,25 +99,30 @@ resume() {
 
 mountsnap() {
 
-# If it is mounted then unmount it.
-MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
-if [ "$MOUNTED" != 0 ]; then 
-	if [ "$DEBUG" != "" ]; then
-		echo "Snapshot already mounted"
-	fi
-	unmountsnap
-	let BAD_CNT+=1
-fi
+for LVM in $LVMS; do
 
-if [ ! -d $MNTPOINT ]; then
-	mkdir -p $MNTPOINT
-fi
+  MNTPOINT="/backup/$LVM-snap" # where to mount the snapshot
+  # If it is mounted then unmount it.
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then 
+  	if [ "$DEBUG" != "" ]; then
+  		echo "Snapshot already mounted"
+  	fi
+  	unmountsnap
+  	let BAD_CNT+=1
+  fi
+  
+  if [ ! -d $MNTPOINT ]; then
+  	mkdir -p $MNTPOINT
+  fi
+  
+  if [ "$MNTOPTIONS" != "" ]; then
+    mount -o $MNTOPTIONS /dev/$VG/$LVM-snap $MNTPOINT
+  else
+    mount /dev/$VG/$LVM-snap $MNTPOINT
+  fi
 
-if [ "$MNTOPTIONS" != "" ]; then
-  mount -o $MNTOPTIONS /dev/$VG/$LVM-snap $MNTPOINT
-else
-  mount /dev/$VG/$LVM-snap $MNTPOINT
-fi
+done
 
 
 }
@@ -129,29 +136,38 @@ savevm() {
 
 unmountsnap() {
 
-MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
-if [ "$MOUNTED" != 0 ]; then
-	umount $MNTPOINT
-fi
+for LVM in $LVMS; do
+  MNTPOINT="/backup/$LVM-snap" # where to mount the snapshot
 
-MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
-if [ "$MOUNTED" != 0 ]; then
-        if [ "$DEBUG" != "" ]; then
-                echo "Snapshot still mounted"
-        fi
-        umount -f $MNTPOINT
-	let BAD_CNT=BAD_CNT + 1
-fi
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then
+  	umount $MNTPOINT
+  fi
+  
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then
+          if [ "$DEBUG" != "" ]; then
+                  echo "Snapshot still mounted"
+          fi
+          umount -f $MNTPOINT
+  	let BAD_CNT=BAD_CNT + 1
+  fi
+
+done
 
 }
 
 removesnap() {
 
-if [ -e /dev/$VG/$LVM-snap ]; then
-	lvremove -f /dev/$VG/$LVM-snap
-else
-	/bin/false
-fi
+for LVM in $LVMS; do
+
+  if [ -e /dev/$VG/$LVM-snap ]; then
+  	lvremove -f /dev/$VG/$LVM-snap
+  else
+  	/bin/false
+  fi
+
+done
 
 }
 
