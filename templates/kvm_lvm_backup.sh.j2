@@ -108,7 +108,7 @@ if [ "$MOUNTED" != 0 ]; then
 fi
 
 if [ ! -d $MNTPOINT ]; then
-	mkdir $MNTPOINT
+	mkdir -p $MNTPOINT
 fi
 
 if [ "$MNTOPTIONS" != "" ]; then
