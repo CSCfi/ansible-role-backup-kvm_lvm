@@ -15,3 +15,6 @@ backup_vg: ""
 #backup_vms: "jade-install"
 #backup_lvm: "install_vm_lv"
 #backup_vg: "admin_vg"
+#
+backup_mntpoint: "/mnt"
+backup_mountoptions: "nouuid" # set to nouuid because XFS

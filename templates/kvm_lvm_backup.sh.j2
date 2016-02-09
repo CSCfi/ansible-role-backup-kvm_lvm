@@ -35,7 +35,8 @@ LVM="{{ backup_lvm }}" # the name of the logical volume (as seen in lvs)
 VG="{{ backup_vg }}" # the name of the volume group (as seen in vgs)
 LVM_PATH="/dev/$VG/$LVM" # the path to the logical volume
 SNAPSIZE="{{ backup_snapsize }}" # the size of the snapshot
-MNTPOINT="/mnt/$LVM-snap" # where to mount the snapshot
+MNTPOINT="{{ backup_mntpoint }}/$LVM-snap" # where to mount the snapshot
+MNTOPTIONS="{{ backup_mountoptions }}" # perhaps nouuid for xfs snapshots
 
 ##############
 
@@ -109,7 +110,12 @@ fi
 if [ ! -d $MNTPOINT ]; then
 	mkdir $MNTPOINT
 fi
-mount /dev/$VG/$LVM-snap $MNTPOINT
+
+if [ "$MNTOPTIONS" != "" ]; then
+  mount -o $MNTOPTIONS /dev/$VG/$LVM-snap $MNTPOINT
+else
+  mount /dev/$VG/$LVM-snap $MNTPOINT
+fi
 
 
 }
