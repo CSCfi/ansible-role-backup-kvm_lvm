@@ -111,7 +111,7 @@ if [ ! -d $MNTPOINT ]; then
 	mkdir -p $MNTPOINT
 fi
 
-if [ "$MNTOPTIONS" != "" ]; then
+if [ "$MNTOPTIONS" != "" ]; then
   mount -o $MNTOPTIONS /dev/$VG/$LVM-snap $MNTPOINT
 else
   mount /dev/$VG/$LVM-snap $MNTPOINT
