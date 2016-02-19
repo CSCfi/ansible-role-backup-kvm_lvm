@@ -1,0 +1,214 @@
+#!/bin/bash
+
+usage() { 
+
+echo "Written by Johan Guldmyr @ CSC 2013-2016 to make backup of virtual machines that use LVM to store their OS image. "
+
+echo "Syntax:"
+echo "$0 1 # Pre-Scan"
+echo "$0 2 # Post-Scan"
+
+echo "Process:"
+echo ""
+echo Pre-Scan:
+echo 1 Suspend
+echo 2 Snapshot
+echo 3 Resume
+echo 4 Mount snapshot
+#echo 5 Run virt-backup.pl to save the VM.
+echo ""
+echo Post-Backup:
+echo 1 Unmount snapshot
+echo 2 Remove snapshot
+#echo 3 Remove files from virt-backup.pl 
+echo ""
+echo "Configuration is done within the file."
+echo ""
+
+exit 3
+
+}
+ 
+##############
+
+DEBUG="1" # anything but "" means debug is on
+VMS="{{ backup_vms }}" # space separated list of virtual machines to resume and suspend
+LVMS="{{ backup_lvms }}" # space separated list of logical volumes (as seen in lvs)
+VG="{{ backup_vg }}" # the name of the volume group (as seen in vgs)
+SNAPSIZE="{{ backup_snapsize }}" # the size of the snapshot
+MNTOPTIONS="{{ backup_mountoptions }}" # perhaps nouuid for xfs snapshots
+
+##############
+
+BAD_CNT=0 # This is used to determine if the script ran fine.
+
+##############
+
+suspend() { 
+
+# Check if the VMs are already suspended and if there are no running VMs then do nothing.
+
+RUNNING=$(virsh list|grep running|wc -l)
+
+if [ "$RUNNING" != 0 ]; then
+	if [ "$DEBUG" != "" ]; then 
+		echo "There are VMs running, suspending the defined ones: $VMS"
+	fi
+
+	for VM in $VMS; do
+		virsh list|grep \"$VM\"
+		if [ $? != 0 ]; then continue; fi # If VM not found, skip it
+		virsh suspend $VM
+	done
+fi
+
+
+}
+
+snapshot() {
+
+# Check if there is an active snapshot first.
+# Take a snapshot of the LVM
+
+for LVM in $LVMS; do
+
+  SNAPSHOT="$(lvs|grep $LVM-snap|wc -l)"
+  if [ "$SNAPSHOT" != 0 ]; then
+  	if [ "$DEBUG" != "" ]; then
+  		echo "There is already a snapshot"
+  	fi
+  	let BAD_CNT+=1
+  	removesnap
+  fi
+  LVM_PATH="/dev/$VG/$LVM" # the path to the logical volume
+  lvcreate -L $SNAPSIZE -s -n "$LVM-snap" $LVM_PATH
+
+done
+
+}
+
+resume() {
+
+# Resume the VM
+
+        for VM in $VMS; do
+                virsh list|grep "$VM"
+                if [ $? != 0 ]; then continue; fi # If VM not found, skip
+                virsh resume $VM
+        done
+
+}
+
+mountsnap() {
+
+for LVM in $LVMS; do
+
+  MNTPOINT="/backup/$LVM-snap" # where to mount the snapshot
+  # If it is mounted then unmount it.
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then 
+  	if [ "$DEBUG" != "" ]; then
+  		echo "Snapshot already mounted"
+  	fi
+  	unmountsnap
+  	let BAD_CNT+=1
+  fi
+  
+  if [ ! -d $MNTPOINT ]; then
+  	mkdir -p $MNTPOINT
+  fi
+  
+  if [ "$MNTOPTIONS" != "" ]; then
+    mount -o $MNTOPTIONS /dev/$VG/$LVM-snap $MNTPOINT
+  else
+    mount /dev/$VG/$LVM-snap $MNTPOINT
+  fi
+
+done
+
+
+}
+
+savevm() {
+
+#echo "Run virt-backup.pl"
+/bin/true
+
+}
+
+unmountsnap() {
+
+for LVM in $LVMS; do
+  MNTPOINT="/backup/$LVM-snap" # where to mount the snapshot
+
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then
+  	umount $MNTPOINT
+  fi
+  
+  MOUNTED="$(cat /proc/mounts|grep $MNTPOINT|wc -l)"
+  if [ "$MOUNTED" != 0 ]; then
+          if [ "$DEBUG" != "" ]; then
+                  echo "Snapshot still mounted"
+          fi
+          umount -f $MNTPOINT
+  	let BAD_CNT=BAD_CNT + 1
+  fi
+
+done
+
+}
+
+removesnap() {
+
+for LVM in $LVMS; do
+
+  if [ -e /dev/$VG/$LVM-snap ]; then
+  	lvremove -f /dev/$VG/$LVM-snap
+  else
+  	/bin/false
+  fi
+
+done
+
+}
+
+removesavevm() {
+
+#echo "Remove previously saved VM."
+/bin/true
+
+}
+
+endgame() {
+
+if [ "$BAD_CNT" != 0 ]; then
+	echo "Things went wrong during the run, try running the script with DEBUG set."
+	exit 2
+else
+	exit 0
+fi
+
+}
+
+if [ "$1" == 1 ]; then
+	suspend
+	snapshot
+	resume
+	mountsnap
+#	savevm
+	endgame
+elif [ "$1" == 2 ]; then
+	unmountsnap
+	removesnap
+#	removesavevm
+	endgame
+else
+	# No arguments: we run PRE
+        suspend
+        snapshot
+        resume
+        mountsnap
+#       savevm
+        endgame
+fi

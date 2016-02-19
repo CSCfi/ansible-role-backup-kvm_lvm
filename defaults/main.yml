@@ -3,6 +3,7 @@
 #
 
 # Where the script will be installed
+backup_script_base: "/usr/local/bin"
 backup_script_dest: "/usr/local/bin/kvm_lvm_backup.sh"
 # Set this to True to copy in the script
 backup_enabled: False
@@ -18,3 +19,9 @@ backup_vg: ""
 #
 backup_mntpoint: "/mnt"
 backup_mountoptions: "nouuid" # set to nouuid because XFS
+
+# template in several backup scripts
+backup_commvault: False
+backup_scripts:
+{ src: "kvm_lvm_backup_commvault10_pre.sh.j2", dest: "{{ backup_script_base }}/kvm_lvm_backup_pre.sh" }
+{ src: "kvm_lvm_backup_commvault10_post.sh.j2", dest: "{{ backup_script_base }}/kvm_lvm_backup_post.sh" }
