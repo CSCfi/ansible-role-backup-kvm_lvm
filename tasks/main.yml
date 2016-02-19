@@ -4,7 +4,7 @@
 
  - name: template in script
    template: src=kvm_lvm_backup.sh.j2 dest={{ backup_script_dest }} mode=0755
-   when: backup_enabled and backup_vms != "" and backup_lvms != "" and backup_vg != "" and backup_commvault != True
+   when: backup_enabled and backup_vms != "" and backup_lvms != "" and backup_vg != "" and backup_scripts is not defined
 
  - name: template in scripts
    template: src={{ item.src }} dest={{ item.dest }} mode=0755
